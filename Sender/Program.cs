@@ -24,8 +24,8 @@ builder.Services.AddMassTransit(options => {
         // "/" - rabbitmq virtual host -> "/" by default (rabbitmq.conf)
         cfg.Host("localhost", "/", cred =>
         {
-            cred.Username("admin");
-            cred.Password("1111");
+            cred.Username(Environment.GetEnvironmentVariable("RABBITMQ_USERNAME") ?? string.Empty);
+            cred.Password(Environment.GetEnvironmentVariable("RABBITMQ_USERPASS") ?? string.Empty);
         });
         cfg.ConfigureEndpoints(ctx);
     });
