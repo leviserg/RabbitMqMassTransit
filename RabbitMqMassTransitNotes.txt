@@ -1,0 +1,88 @@
+NuGet Packages to install:
+	MassTransit
+	MassTransit.RabbitMQ
+
+/*
+	adjustment options in Program.cs:
+	1. Using local In memory:
+
+		builder.Services.AddMassTransit(options => {
+			options.AddConsumers(typeof(Program).Assembly); // find all IConsumer imp;lementations within current assembly
+			options.UsingInMemory((ctx, cfg) =>
+			{
+				cfg.ConfigureEndpoints(ctx);
+			});
+		});
+*/
+	2. Using MessageQueue (RabbitMQ) -> see Program.cs and Services inside of Sender and receiver projects
+
+> dotnet new -i MassTransit.Templates
+
+> docker pull bitnami/rabbitmq:4.0.3 
+	{> docker pull rabbitmq:4.0.3}
+> docker run --name rabbitmqlocal --hostname rabbitmqlocalhost  -e "RABBITMQ_DEFAULT_USER=*" -e "RABBITMQ_DEFAULT_PASS=*" -e "RABBITMQ_SECURE_PASSWORD=no" -d -p 15672:15672 bitnami/rabbitmq:4.0.3
+	{docker run --name rabbitmqlocal --hostname rabbitmqlocalhost -d -p 15672:15672 -p 5672:5672 rabbitmq:4.0.3}
+	(web ui available on http://localhots:15672 (L:guest; P:guest) - starting time up to 15 sec)
+
+> export RABBITMQ_USERNAME="*"
+> export RABBITMQ_USERPASS="*"
+> docker-compose -f docker-composer.yml up -d
+> docker-compose -f docker-composer.yml down
+> docker-compose -f docker-composer.yml start
+> docker-compose -f docker-composer.yml stop
+> docker-compose -f docker-composer.yml build
+
+#################### docker-compose.yml ####################
+
+services:
+	rabbitmqlocal:
+		image: bitnami/rabbitmq:4.0.3
+		hostname: rabbitmqhost
+		# restart: always (optional - prod setup only)
+		environment:
+			- RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
+			- RABBITMQ_DEFAULT_PASS=${RABBITMQ_USERPASS}
+			- RABBITMQ_SECURE_PASSWORD=no
+			- RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit log_levels [{connection,error},{default,error}] disk_free_limit 268435456 # 268435456 : 256 MB 2147483648 - bits : 2GB
+		volumes:
+			- ./rabbitmq:/var/lib/rabbitmq
+		ports:
+			- 15672:15672
+			- 5672:5672 # (AMQP)
+
+####################
+If WebUI is not accessible (User not allowed to login:)
+## opt/bitnami/etc/rabbitmq/rabbitmq.conf -> comment "## loopback_users.{yourdefaultuser} = true" to access from WebUI
+####################
+
+docker commands for RabbitMQ:
+> docker-compose exec rabbitmq bash
+	$ rabbitmqctl list_queues
+	$ rabbitmqctl list_exchanges
+	$ rabbitmqctl help
+	$ rabbitmqctl add_user 'user' '1111'
+
+	$ rabbitmqctl list_users --formatter=json
+	$ rabbitmqctl delete_user 'user'
+
+	$ rabbitmqctl set_permissions -p "/" "user" ".*" ".*" ".*"
+		- # First ".*" for configure permission on every entity
+		- # Second ".*" for write permission on every entity
+		- # Third ".*" for read permission on every entity
+		- # "/" - means virtual host address - get/set in opt/bitnami/etc/rabbitmq/rabbitmq.conf or via cmd "rabbitmqctl add_vhost /my_vhost"
+		   " rabbitmqctl help - search for Virtual Hosts"
+
+
+	(rabbitmqadmin CMD - working with AMQP)
+	$ rabbitmqadmin help subcommands
+	$ rabbitmqadmin -urmuser -prmpassword declare queue name=console_queue
+	$ rabbitmqadmin -urmuser -prmpassword declare exchange name=console_exchange type=direct
+	$ rabbitmqadmin -urmuser -prmpassword declare binding source=console_exchange destination=console_queue routing_key=test
+	$ rabbitmqadmin -urmuser -prmpassword publish routing_key=console_queue payload="test message from rabbitmqadmin"
+	$ rabbitmqadmin -urmuser -prmpassword publish exchange=console_exchange routing_key=test payload="test message from rabbitmqadmin"
+	$ rabbitmqadmin -urmuser -prmpassword get queue=console_queue count=10
+	$ rabbitmqadmin -urmuser -prmpassword list queues
+	$ rabbitmqadmin -urmuser -prmpassword list exchanges
+	$ rabbitmqadmin -urmuser -prmpassword list bindings
+	$ rabbitmqadmin -urmuser -prmpassword export backup.json
+	$ rabbitmqadmin -urmuser -prmpassword import backup.json
